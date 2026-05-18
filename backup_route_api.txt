@@ -1,37 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "@/lib/gemini";
 
-// This server route receives a POST from the client and forwards the request to Google's Gemini API.
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // Parse the incoming JSON body and extract parameters.
-    const { jobTitle, experienceLevel, questionFocus, questionCount } = (await req.json()) as {
-      jobTitle?: string;
-      experienceLevel?: string;
-      questionFocus?: string;
-      questionCount?: number;
-    };
+    const { jobTitle, experienceLevel, questionFocus, questionCount } = await req.json();
+
+    const count = questionCount || 3;
     const title = (jobTitle || "Customer Success Manager").trim();
     const level = experienceLevel || "Mid Level";
     const focus = questionFocus || "Mixed";
-    const count = questionCount || 3;
-
-    // Validate the job title before calling the AI.
-    if (!title) {
-      return NextResponse.json(
-        { error: "Job title is required." },
-        { status: 400 }
-      );
-    }
-
-    // Pull the Gemini key from environment variables on the server.
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Gemini API key is not configured." },
-        { status: 500 }
-      );
-    }
 
     // Create the prompt that asks the AI to generate the role-specific questions and rubrics.
     const prompt = `You are a professional HR specialist and senior hiring manager.
@@ -54,19 +31,17 @@ Remember: You MUST output exactly ${count} distinct blocks separated by '---'.`;
     // Generate response using Google Gemini API
     const aiText = await generateText(prompt);
 
-    if (!aiText) {
-      return NextResponse.json(
-        { error: "Gemini returned an unexpected empty response." },
-        { status: 500 }
-      );
-    }
-
-    // Return the AI-generated question text to the browser.
-    return NextResponse.json({ questions: aiText.trim() });
+    return NextResponse.json({
+      success: true,
+      questions: aiText.trim(),
+    });
   } catch (error) {
-    // Catch any unexpected errors and return a friendly message.
+    console.error("Error in /api/questions:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error." },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal Server Error",
+      },
       { status: 500 }
     );
   }
